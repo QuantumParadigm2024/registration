@@ -1,7 +1,6 @@
 package com.planotech.plano.helper;
 
 import com.jcraft.jsch.*;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
@@ -26,34 +25,48 @@ public class FileUploader {
 
     private final ExecutorService executorService = Executors.newFixedThreadPool(10);
 
-    public List<String> handleFileUpload(MultipartFile[] files) {
-        List<String> filelist = new ArrayList<String>();
-        CompletableFuture[] futures = new CompletableFuture[files.length];
-        for (int i = 0; i < files.length; i++) {
-            MultipartFile file = files[i];
-            try {
-                byte[] fileBytes = file.getBytes();
-                String originalFilename = file.getOriginalFilename();
-                ;
-                assert originalFilename != null;
-                String uniqueFileName = generateUniqueFileName(originalFilename);
+//    public List<String> handleFileUpload(List<MultipartFile> files) {
+//        List<String> filelist = Collections.synchronizedList(new ArrayList<>());
+//        CompletableFuture[] futures = new CompletableFuture[files.size()];
+//        for (int i = 0; i < files.size(); i++) {
+//            MultipartFile file = files.get(i);
+//            try {
+//                byte[] fileBytes = file.getBytes();
+//                String originalFilename = file.getOriginalFilename();
+//                ;
+//                assert originalFilename != null;
+//                String uniqueFileName = generateUniqueFileName(originalFilename);
+//
+//                futures[i] = CompletableFuture.runAsync(() -> {
+//                    String fileUrl = uploadFileViaSFTP(fileBytes, uniqueFileName);
+//                    filelist.add(fileUrl);
+//                }, executorService);
+//            } catch (IOException e) {
+//                throw new RuntimeException("File Not supported");
+//            }
+//        }
+//        return filelist;
+//    }
 
-                futures[i] = CompletableFuture.runAsync(() -> {
-                    String fileUrl = uploadFileViaSFTP(fileBytes, uniqueFileName);
-                    if (fileUrl != null) {
-                        filelist.add(fileUrl);
-                    }
-                }, executorService);
-            } catch (IOException e) {
-                throw new RuntimeException("File Not supported");
+    public CompletableFuture<List<String>> handleFileUploadAsync(List<MultipartFile> files) {
+        System.out.println("handleFileUploadAsync");
+        files.forEach(file -> System.out.println(file.getOriginalFilename()));
+        return CompletableFuture.supplyAsync(() -> {
+            List<String> filelist = new ArrayList<>();
+
+            for (MultipartFile file : files) {
+                try {
+                    byte[] fileBytes = file.getBytes();
+                    String uniqueFileName = generateUniqueFileName(file.getOriginalFilename());
+                    String url = uploadFileViaSFTP(fileBytes, uniqueFileName);
+                    filelist.add(url);
+                } catch (Exception e) {
+                    throw new RuntimeException(e.getMessage());
+                }
             }
-        }
-        try {
-            CompletableFuture.allOf(futures).get();
-        } catch (Exception e) {
-            throw new RuntimeException(e.getMessage());
-        }
-        return filelist;
+
+            return filelist;
+        }, executorService);
     }
 
     private String uploadFileViaSFTP(byte[] fileBytes, String fileName) {
@@ -75,7 +88,7 @@ public class FileUploader {
             }
             return BASE_URL + fileName;
         } catch (JSchException | SftpException | IOException e) {
-           throw new RuntimeException(e.getMessage());
+            throw new RuntimeException(e.getMessage());
         } finally {
             if (sftpChannel != null) {
                 try {
@@ -95,7 +108,7 @@ public class FileUploader {
     }
 
     private String generateUniqueFileName(String originalFilename) {
-        return UUID.randomUUID().toString().replace("-", "").substring(0, 6)+"_"+originalFilename ;
+        return UUID.randomUUID().toString().replace("-", "").substring(0, 6) + "_" + originalFilename;
     }
 
     public ResponseEntity<Map<String, Object>> deleteFile(String fileUrl) {

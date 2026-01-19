@@ -1,6 +1,7 @@
 package com.planotech.plano.service;
 
 import com.planotech.plano.exception.CustomBadRequestException;
+import com.planotech.plano.helper.EventMediaAsyncService;
 import com.planotech.plano.helper.FileUploader;
 import com.planotech.plano.model.Event;
 import com.planotech.plano.model.EventCustomField;
@@ -12,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
@@ -25,9 +27,13 @@ public class EventService {
     @Autowired
     FileUploader fileUploader;
 
-    public ResponseEntity<?> createEvent(EventCreateRequest eventRequest, Map<String, MultipartFile[]> files, User user) {
+    @Autowired
+    EventMediaAsyncService eventMediaAsyncService;
+
+    public ResponseEntity<?> createEvent(EventCreateRequest eventRequest, MultiValueMap<String, MultipartFile> files, User user) {
+
         if (eventRepository.findByName(eventRequest.getName()).isPresent()) {
-            throw new CustomBadRequestException("Event already exists");
+            throw new CustomBadRequestException("Event already exists with the same name");
         }
         Event event = new Event();
         event.setName(eventRequest.getName());
@@ -46,16 +52,10 @@ public class EventService {
                 event.getCustomFields().add(field);
             });
         }
+//        eventRepository.save(event);
         if (files != null && !files.isEmpty()){
-            files.forEach((mediaType, multipartFiles) -> {
-                EventMedia media = new EventMedia();
-                media.setEvent(event);
-                media.setMediaType(mediaType);
-                media.setMediaUrls(fileUploader.handleFileUpload(multipartFiles));
-                event.getMediaList().add(media);
-            });
+            eventMediaAsyncService.uploadMediaAsync(event, files);
         }
-        eventRepository.save(event);
         return ResponseEntity.ok(Map.of(
                 "message", "Event created successfully",
                 "status", "success",
