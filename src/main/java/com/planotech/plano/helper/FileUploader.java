@@ -1,6 +1,8 @@
 package com.planotech.plano.helper;
 
 import com.jcraft.jsch.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
@@ -15,6 +17,9 @@ import java.util.concurrent.Executors;
 
 @Component
 public class FileUploader {
+    private static final Logger log =
+            LoggerFactory.getLogger(FileUploader.class);
+
 
     public static final int SFTP_PORT = 22;
     public static final String SFTP_USER = "dh_gmj3vr";
@@ -48,19 +53,21 @@ public class FileUploader {
 //        return filelist;
 //    }
 
-    public CompletableFuture<List<String>> handleFileUploadAsync(List<MultipartFile> files) {
+    public CompletableFuture<List<String>> handleFileUploadAsync(List<UploadFileData> files) {
         System.out.println("handleFileUploadAsync");
-        files.forEach(file -> System.out.println(file.getOriginalFilename()));
+        files.forEach(file -> System.out.println(file.getOriginalName()));
         return CompletableFuture.supplyAsync(() -> {
             List<String> filelist = new ArrayList<>();
 
-            for (MultipartFile file : files) {
+            for (UploadFileData file : files) {
                 try {
-                    byte[] fileBytes = file.getBytes();
-                    String uniqueFileName = generateUniqueFileName(file.getOriginalFilename());
+                    byte[] fileBytes = file.getData();
+                    String uniqueFileName = generateUniqueFileName(file.getOriginalName());
                     String url = uploadFileViaSFTP(fileBytes, uniqueFileName);
                     filelist.add(url);
+                    log.info("File uploaded: {} → {}", file.getOriginalName(), url);
                 } catch (Exception e) {
+                    log.error("File upload failed for {}", file.getOriginalName(), e);
                     throw new RuntimeException(e.getMessage());
                 }
             }
