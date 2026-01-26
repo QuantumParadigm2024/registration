@@ -53,7 +53,9 @@ public class UserService {
         try {
             Authentication authenticate = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(email, password));
             if (authenticate.isAuthenticated()) {
-                User user = userRepository.findByEmail(email);
+                User user = userRepository.findByEmail(email).orElseThrow(() -> new UserNotExistsException(
+                        "User not found with email: " + email
+                ));
                 String jwtToken = jwtService.generateToken(user);
                 String refreshToken = jwtService.generateRefreshToken(user);
                 user.setRefreshToken(refreshToken);
@@ -80,10 +82,9 @@ public class UserService {
 
     public ResponseEntity<?> forgotPassword(String email) {
         Map<String, Object> response = new HashMap<>();
-        User exUser = userRepository.findByEmail(email);
-        if (exUser == null) {
-            throw new UserNotExistsException("User Doesn't Exists");
-        }
+        User exUser = userRepository.findByEmail(email).orElseThrow(() -> new UserNotExistsException(
+                "User not found with email: "
+        ));
         String verificationToken = UUID.randomUUID().toString();
         PasswordResetToken resetToken = new PasswordResetToken();
         resetToken.setToken(verificationToken);

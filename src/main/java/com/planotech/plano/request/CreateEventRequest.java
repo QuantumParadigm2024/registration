@@ -7,12 +7,16 @@ import java.time.LocalDate;
 import java.util.Map;
 
 @Data
-public class EventCreateRequest {
+public class CreateEventRequest {
     private String name;
     private String description;
     private LocalDate startDate;
     private LocalDate endDate;
     private MultipartFile logo;
     private String location;
-    private Map<String, String> dynamicFields;
+
+    private String username;
+    private String email;
+    private String phone;
+    private String password;
 }
