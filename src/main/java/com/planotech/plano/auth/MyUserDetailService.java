@@ -21,10 +21,7 @@ public class MyUserDetailService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userRepo.findByEmail(username);
-        if (user == null) {
-            throw new UsernameNotFoundException("user not found");
-        }
+        User user = userRepo.findByEmail(username).orElseThrow(()->new UsernameNotFoundException("user not found"));
         if (user.getRole() == Role.ROLE_SUPER_ADMIN) {
             return new UserPrincipal(user);
         }

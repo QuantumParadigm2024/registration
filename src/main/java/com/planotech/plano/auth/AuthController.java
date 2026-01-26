@@ -2,6 +2,7 @@ package com.planotech.plano.auth;
 
 
 import com.planotech.plano.exception.CustomJwtException;
+import com.planotech.plano.exception.UserNotExistsException;
 import com.planotech.plano.model.User;
 import com.planotech.plano.repository.UserRepository;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -35,7 +36,7 @@ public class AuthController {
         }
         try {
             String email = jwtService.extractUsername(refreshToken);
-            User user = userRepo.findByEmail(email);
+            User user = userRepo.findByEmail(email).orElseThrow(()-> new UserNotExistsException("User Not found"));
             if (user == null || !refreshToken.equals(user.getRefreshToken())) {
                 throw new CustomJwtException("Invalid refresh token");
             }

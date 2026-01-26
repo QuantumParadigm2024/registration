@@ -30,48 +30,24 @@ public class FileUploader {
 
     private final ExecutorService executorService = Executors.newFixedThreadPool(10);
 
-//    public List<String> handleFileUpload(List<MultipartFile> files) {
-//        List<String> filelist = Collections.synchronizedList(new ArrayList<>());
-//        CompletableFuture[] futures = new CompletableFuture[files.size()];
-//        for (int i = 0; i < files.size(); i++) {
-//            MultipartFile file = files.get(i);
-//            try {
-//                byte[] fileBytes = file.getBytes();
-//                String originalFilename = file.getOriginalFilename();
-//                ;
-//                assert originalFilename != null;
-//                String uniqueFileName = generateUniqueFileName(originalFilename);
-//
-//                futures[i] = CompletableFuture.runAsync(() -> {
-//                    String fileUrl = uploadFileViaSFTP(fileBytes, uniqueFileName);
-//                    filelist.add(fileUrl);
-//                }, executorService);
-//            } catch (IOException e) {
-//                throw new RuntimeException("File Not supported");
-//            }
-//        }
-//        return filelist;
-//    }
+    public CompletableFuture<List<String>> handleFileUploadAsync(List<MultipartFile> files) {
 
-    public CompletableFuture<List<String>> handleFileUploadAsync(List<UploadFileData> files) {
-        System.out.println("handleFileUploadAsync");
-        files.forEach(file -> System.out.println(file.getOriginalName()));
+        files.forEach(file -> System.out.println(file.getOriginalFilename()));
         return CompletableFuture.supplyAsync(() -> {
             List<String> filelist = new ArrayList<>();
 
-            for (UploadFileData file : files) {
+            for (MultipartFile file : files) {
                 try {
-                    byte[] fileBytes = file.getData();
-                    String uniqueFileName = generateUniqueFileName(file.getOriginalName());
+                    byte[] fileBytes = file.getBytes();
+                    String uniqueFileName = generateUniqueFileName(file.getOriginalFilename());
                     String url = uploadFileViaSFTP(fileBytes, uniqueFileName);
                     filelist.add(url);
-                    log.info("File uploaded: {} → {}", file.getOriginalName(), url);
+                    log.info("File uploaded: {} → {}", file.getOriginalFilename(), url);
                 } catch (Exception e) {
-                    log.error("File upload failed for {}", file.getOriginalName(), e);
+                    log.error("File upload failed for {}", file.getOriginalFilename(), e);
                     throw new RuntimeException(e.getMessage());
                 }
             }
-
             return filelist;
         }, executorService);
     }
@@ -188,10 +164,4 @@ public class FileUploader {
             }
         }
     }
-
-    private static final List<String> VALID_EXTENSIONS = Arrays.asList(
-            ".pdf", ".xls", ".xlsx", ".doc", ".docx", ".png", ".jpg", ".jpeg", ".svg", ".cdr",
-            ".fbx", ".ai", ".psd", ".eps", ".tiff", ".gif", ".mp4", ".mov", ".mp3", ".wav",
-            ".zip", ".rar", ".7z", ".proj", ".pr", ".ppt", ".pptx"
-    );
 }

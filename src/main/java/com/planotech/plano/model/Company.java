@@ -8,15 +8,16 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
-@Entity
-@Data
-public class Company {
+    @Entity
+    @Data
+    public class Company {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    private String companyName;
-    private String description;
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
+        private Long id;
+        private String companyName;
+        @Column(columnDefinition = "TEXT")
+        private String description;
 
     @Enumerated(EnumType.STRING)
     private SubscriptionType subscriptionType;
@@ -26,6 +27,15 @@ public class Company {
     private LocalDate endDate;
     private boolean active;
 
-    @OneToMany(mappedBy = "company")
-    private List<User> users;
+        // Organization Admin for this company
+        @OneToMany(mappedBy = "company", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+        private List<User> organizationAdmin;
+
+        // Events under this company
+        @OneToMany(mappedBy = "company", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+        private List<Event> events;
+
+        // Users (Event Admins under company)
+        @OneToMany(mappedBy = "company", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+        private List<User> users;
 }
