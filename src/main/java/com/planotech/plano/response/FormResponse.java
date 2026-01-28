@@ -2,11 +2,13 @@ package com.planotech.plano.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
 @AllArgsConstructor
-public class EventUserDTO {
+@NoArgsConstructor
+public class FormResponse {
     private Long id;
-    private String name;
-    private String email;
+    private Integer version;
 }
+

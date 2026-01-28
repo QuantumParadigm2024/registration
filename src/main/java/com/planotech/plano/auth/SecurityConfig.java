@@ -38,6 +38,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) {
         return httpSecurity
+                .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
                 .httpBasic(Customizer.withDefaults())
                 .authorizeHttpRequests(request -> request

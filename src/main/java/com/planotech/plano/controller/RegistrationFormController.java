@@ -44,12 +44,8 @@ public class RegistrationFormController {
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ORG_ADMIN','EVENT_ADMIN')")
     @PostMapping("/{formId}/publish")
     public ResponseEntity<?> publish(@PathVariable Long formId, @AuthenticationPrincipal UserPrincipal user) {
-        formService.publish(formId, user.getUser());
-        return ResponseEntity.ok(Map.of(
-                "message", "Form published",
-                "code", 200,
-                "status", "success"
-        ));
+        return formService.publish(formId, user.getUser());
+
     }
 
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ORG_ADMIN','EVENT_ADMIN')")
