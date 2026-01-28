@@ -9,6 +9,8 @@ public class SecurityConstants {
             "/user/refresh",
             "/user/forgot/password/request",
             "/user/auth/reset-password",
+            "/public/events/**",
+            "/file/upload",
             "/test"
     };
 }

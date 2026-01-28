@@ -13,4 +13,5 @@ public class RegistrationFormResponse {
     private FormStatus status;
     private Boolean active;
     private List<FormFieldResponse> fields;
+    private String eventKey;
 }

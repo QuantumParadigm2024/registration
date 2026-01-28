@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -64,31 +65,6 @@ public class RegistrationFormService {
         formRepository.save(form);
         return success(toDto(form), "Draft created");
     }
-
-//    @Transactional
-//    public void saveDraft(Long formId, List<FormFieldRequest> requests, User user) {
-//        RegistrationForm form = formRepository.findById(formId)
-//                .orElseThrow(() -> new ResourceNotFoundException("Form not found"));
-//
-//        if (form.getStatus() != FormStatus.DRAFT) {
-//            throw new IllegalStateException("Cannot edit published form");
-//        }
-//
-//        form.getFields().clear();
-//
-//        for (FormFieldRequest req : requests) {
-//            FormField field = new FormField();
-//            field.setForm(form);
-//            field.setFieldKey(req.getFieldKey());
-//            field.setLabel(req.getLabel());
-//            field.setFieldType(req.getFieldType());
-//            field.setRequired(req.isRequired());
-//            field.setOptionsJson(req.getOptionsJson());
-//            field.setDisplayOrder(req.getDisplayOrder());
-//            form.getFields().add(field);
-//        }
-//        formRepository.save(form);
-//    }
 
     @Transactional
     public void saveDraft(Long formId, List<FormFieldRequest> requests, User user) {
@@ -140,7 +116,7 @@ public class RegistrationFormService {
     }
 
     @Transactional
-    public void publish(Long formId, User user) {
+    public ResponseEntity<?> publish(Long formId, User user) {
 
         RegistrationForm form = formRepository.findById(formId)
                 .orElseThrow(() -> new ResourceNotFoundException("Form not found"));
@@ -162,26 +138,36 @@ public class RegistrationFormService {
                 form.getEvent().getId(),
                 form.getId()
         );
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Form published",
+                "code", 200,
+                "status", "success",
+                "eventKey", form.getEvent().getEventKey()
+        ));
     }
 
     public ResponseEntity<?> getFormByEvent(Long eventId) {
-        Optional<RegistrationForm> draftForm =
-                formRepository.findTopByEventIdAndStatusOrderByVersionDesc(
-                        eventId, FormStatus.DRAFT
-                );
-
-        if (draftForm.isPresent()) {
-            return success(toDto(draftForm.get()), "Draft form fetched");
-        }
 
         Optional<RegistrationForm> publishedForm =
                 formRepository.findTopByEventIdAndStatusOrderByVersionDesc(
                         eventId, FormStatus.PUBLISHED
                 );
-
         if (publishedForm.isPresent()) {
             return success(toDto(publishedForm.get()), "Published form fetched");
         }
+
+        Optional<RegistrationForm> draftForm =
+                formRepository.findTopByEventIdAndStatusOrderByVersionDesc(
+                        eventId, FormStatus.DRAFT
+                );
+        if (draftForm.isPresent()) {
+            return success(toDto(draftForm.get()), "Draft form fetched");
+        }
+
+
+
+
         throw new ResourceNotFoundException("No registration form exists for this event");
     }
 
@@ -287,6 +273,7 @@ public class RegistrationFormService {
         dto.setVersion(form.getVersion());
         dto.setStatus(form.getStatus());
         dto.setActive(form.getActive());
+        dto.setEventKey(form.getEvent().getEventKey());
 
         dto.setFields(
                 form.getFields().stream()
