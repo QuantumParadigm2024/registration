@@ -1,0 +1,50 @@
+package com.planotech.plano.controller;
+
+import com.planotech.plano.auth.UserPrincipal;
+import com.planotech.plano.service.EventService;
+import com.planotech.plano.service.RegistrationService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/admin")
+public class AdminRegistrationController {
+
+    @Autowired
+    RegistrationService registrationService;
+
+    @GetMapping("/events/{eventId}/registrations")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ORG_ADMIN','USER')")
+    public ResponseEntity<?> getRegistrations(
+            @PathVariable Long eventId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String formType,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        return registrationService.getRegistrations(eventId, page, size, search, formType,userPrincipal.getUser());
+    }
+
+    @GetMapping("/events/{eventId}/exportAll")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ORG_ADMIN','USER')")
+    public ResponseEntity<?> exportAll(
+            @PathVariable Long eventId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        return registrationService.exportAll(eventId, userPrincipal.getUser());
+    }
+
+    @GetMapping("/events/{eventId}/formType")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ORG_ADMIN','USER')")
+    public ResponseEntity<?> getFormType(
+            @PathVariable Long eventId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        return registrationService.getFormTypes(eventId, userPrincipal.getUser());
+    }
+
+}

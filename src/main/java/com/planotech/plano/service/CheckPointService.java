@@ -1,0 +1,347 @@
+package com.planotech.plano.service;
+
+import com.planotech.plano.enums.CheckpointType;
+import com.planotech.plano.exception.CustomBadRequestException;
+import com.planotech.plano.exception.ResourceNotFoundException;
+import com.planotech.plano.helper.JsonUtil;
+import com.planotech.plano.model.*;
+import com.planotech.plano.repository.CheckpointLogRepository;
+import com.planotech.plano.repository.CheckpointRepository;
+import com.planotech.plano.repository.EventRepository;
+import com.planotech.plano.repository.RegistrationEntryRepository;
+import com.planotech.plano.request.CreateCheckpointRequest;
+import com.planotech.plano.response.BadgeListResponse;
+import com.planotech.plano.response.CheckpointLogResponse;
+import com.planotech.plano.response.CheckpointResponse;
+import jakarta.transaction.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+
+@Service
+public class CheckPointService {
+
+    @Autowired
+    EventAuthorizationService eventAuthorizationService;
+
+    @Autowired
+    EventRepository eventRepository;
+
+    @Autowired
+    CheckpointRepository checkpointRepository;
+
+    @Autowired
+    RegistrationEntryRepository registrationEntryRepository;
+
+    @Autowired
+    CheckpointLogRepository checkpointLogRepository;
+
+    @Autowired
+    JsonUtil jsonUtils;
+
+    @Autowired
+    ObjectMapper objectMapper;
+
+    public ResponseEntity<?> getCheckPoints(Long eventId, User user) {
+        eventAuthorizationService.authorize(eventId, user);
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new RuntimeException("Event not found"));
+        List<CheckpointResponse> checkpoints =
+                checkpointRepository.findByEventAndActiveTrue(event)
+                        .stream()
+                        .map(cp -> CheckpointResponse.builder()
+                                .checkpointId(cp.getCheckpointId())
+                                .name(cp.getName())
+                                .type(cp.getType())
+                                .systemDefined(cp.getSystemDefined())
+                                .active(cp.getActive())
+                                .metadata(jsonUtils.toMap(cp.getMetadataJson()))
+                                .build()
+                        )
+                        .toList();
+
+        return ResponseEntity.ok(
+                Map.of(
+                        "status", "success",
+                        "data", checkpoints,
+                        "code", 200
+                )
+        );
+    }
+
+    public ResponseEntity<?> scanQr(Long eventId, String badgeCode, Long checkpointId, User user) {
+        eventAuthorizationService.authorize(eventId, user);
+        RegistrationEntry entry = registrationEntryRepository
+                .findByBadgeCode(badgeCode).orElseThrow(() -> new ResourceNotFoundException("Badge code not found"));
+        Checkpoint checkpoint = checkpointRepository.findById(checkpointId)
+                .orElseThrow(() -> new RuntimeException("Checkpoint not found"));
+        validateCheckpointAccess(checkpoint, entry, user);
+
+        return switch (checkpoint.getType()) {
+
+            case REGISTRATION -> handleRegistration(eventId, entry, user, checkpoint);
+
+            case KIT -> handleKit(entry, user, checkpoint);
+
+            case FOOD -> handleFood(entry, user, checkpoint);
+
+            case HALL, CUSTOM -> {
+                saveLog(entry, checkpoint, user);
+                yield ResponseEntity.ok(success(entry, checkpoint));
+            }
+        };
+    }
+
+    private void validateCheckpointAccess(Checkpoint checkpoint, RegistrationEntry entry, User user) {
+        if (checkpoint.getType() == CheckpointType.REGISTRATION) {
+            return;
+        }
+        if (!entry.getCheckedIn()) {
+//            throw new CustomBadRequestException("Attendee must complete registration before accessing " + checkpoint.getType());
+            entry.setCheckedIn(true);
+            entry.setCheckedInAt(LocalDateTime.now());
+//            saveLog(entry, checkpoint, user);
+            registrationEntryRepository.save(entry);
+        }
+    }
+
+    private ResponseEntity<?> handleFood(RegistrationEntry entry, User user, Checkpoint checkpoint) {
+        LocalDate today = LocalDate.now();
+        LocalDateTime startOfDay = today.atStartOfDay();
+        LocalDateTime endOfDay = today.atTime(23, 59, 59);
+
+        boolean scannedToday =
+                checkpointLogRepository.alreadyScannedToday( entry,
+                        checkpoint,
+                        startOfDay,
+                        endOfDay);
+
+        System.out.println("scanned Today"+scannedToday);
+        if (scannedToday) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of(
+                            "message", "Already consumed " + checkpoint.getName() + " today",
+                            "status", "fail",
+                            "code", HttpStatus.BAD_REQUEST.value()
+                    ));
+        }
+        saveLog(entry, checkpoint, user);
+        return ResponseEntity.ok(success(entry, checkpoint));
+    }
+
+    private ResponseEntity<?> handleKit(RegistrationEntry entry, User user, Checkpoint checkpoint) {
+        if (checkpointLogRepository
+                .existsByCheckpointAndRegistrationEntry(checkpoint, entry)) {
+
+            return ResponseEntity.badRequest()
+                    .body(Map.of(
+                            "message", "Kit already collected",
+                            "status", "fail",
+                            "code", HttpStatus.BAD_REQUEST.value()
+                    ));
+        }
+        saveLog(entry, checkpoint, user);
+        return ResponseEntity.ok(success(entry, checkpoint));
+    }
+
+    private ResponseEntity<?> handleRegistration(Long eventId, RegistrationEntry entry, User user, Checkpoint checkpoint) {
+        if (Boolean.TRUE.equals(entry.getCheckedIn())) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of(
+                            "message", "Already checked in",
+                            "status", "fail",
+                            "code", HttpStatus.BAD_REQUEST.value()
+                    ));
+        }
+        entry.setCheckedIn(true);
+        entry.setCheckedInAt(LocalDateTime.now());
+        registrationEntryRepository.save(entry);
+        saveLog(entry, checkpoint, user);
+        RegistrationEntry badgeEntry = registrationEntryRepository
+                .findByEvent_EventIdAndBadgeCode(eventId, entry.getBadgeCode())
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Badge not found")
+                );
+        BadgeListResponse response = toBadgeListResponse(badgeEntry);
+        return ResponseEntity.ok(Map.of(
+                "status", "SUCCESS",
+                "action", "PRINT_BADGE",
+                "name", entry.getName(),
+                "data", response
+        ));
+    }
+
+    private BadgeListResponse toBadgeListResponse(RegistrationEntry entry) {
+        BadgeListResponse res = new BadgeListResponse();
+
+        res.setEntryId(entry.getEntryId());
+        res.setName(entry.getName());
+        res.setEmail(entry.getEmail());
+        res.setPhone(entry.getPhone());
+
+        res.setBadgeCode(entry.getBadgeCode());
+
+        res.setSubmittedAt(entry.getSubmittedAt());
+
+        try {
+            res.setResponses(
+                    objectMapper.readValue(
+                            entry.getResponsesJson(),
+                            new TypeReference<Map<String, Object>>() {
+                            }
+                    )
+            );
+        } catch (Exception e) {
+            res.setResponses(Map.of());
+        }
+
+        return res;
+    }
+
+    public void saveLog(
+            RegistrationEntry entry,
+            Checkpoint checkpoint,
+            User scanner
+    ) {
+        checkpointLogRepository.save(
+                CheckpointLog.builder()
+                        .event(checkpoint.getEvent())
+                        .registrationEntry(entry)
+                        .checkpoint(checkpoint)
+                        .scannedBy(scanner)
+                        .scannedAt(LocalDateTime.now())
+                        .build()
+        );
+    }
+
+    private Map<String, Object> success(
+            RegistrationEntry entry,
+            Checkpoint checkpoint
+    ) {
+        return Map.of(
+                "status", "SUCCESS",
+                "attendee", entry.getName(),
+                "checkpoint", checkpoint.getName(),
+                "time", LocalDateTime.now()
+        );
+    }
+
+
+    @Transactional
+    public ResponseEntity<?> createCheckpoint(Long eventId, CreateCheckpointRequest request, User user) {
+
+        eventAuthorizationService.authorize(eventId, user);
+
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new ResourceNotFoundException("Event not found"));
+
+        Checkpoint checkpoint = new Checkpoint();
+        checkpoint.setEvent(event);
+        checkpoint.setType(request.getType());
+        checkpoint.setName(request.getName());
+        checkpoint.setSystemDefined(false);
+        checkpoint.setActive(true);
+        checkpoint.setCreatedAt(LocalDateTime.now());
+
+        if (request.getMetadata() != null) {
+            checkpoint.setMetadataJson(
+                    objectMapper.writeValueAsString(request.getMetadata())
+            );
+        }
+        checkpointRepository.save(checkpoint);
+
+        return ResponseEntity.ok(Map.of(
+                "status", "success",
+                "message", "Checkpoint added"
+        ));
+    }
+
+    private CheckpointLogResponse toDto(CheckpointLog log) {
+
+        return CheckpointLogResponse.builder()
+                .attendeeName(log.getRegistrationEntry().getName())
+                .attendeeEmail(log.getRegistrationEntry().getEmail())
+                .badgeCode(log.getRegistrationEntry().getBadgeCode())
+                .checkpointName(log.getCheckpoint().getName())
+                .checkpointType(log.getCheckpoint().getType())
+                .scannedBy(log.getScannedBy().getName())
+                .scannedAt(log.getScannedAt())
+                .build();
+    }
+
+
+    @Transactional
+    public ResponseEntity<?> getLogs(
+            Long eventId,
+            CheckpointType type,
+            Long checkpointId,
+            LocalDate fromDate,
+            LocalDate toDate,
+            int page,
+            int size,
+            User user
+    ) {
+
+        eventAuthorizationService.authorize(eventId, user);
+
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new ResourceNotFoundException("Event not found"));
+
+        // Convert LocalDate to LocalDateTime range
+        LocalDateTime fromDateTime = null;
+        LocalDateTime toDateTime = null;
+
+        if (fromDate != null) {
+            fromDateTime = fromDate.atStartOfDay(); // 00:00:00
+        }
+
+        if (toDate != null) {
+            toDateTime = toDate.atTime(23, 59, 59); // End of day
+        }
+
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by("scannedAt").descending()
+        );
+
+        Page<CheckpointLog> logsPage = checkpointLogRepository
+                .findLogsWithFilters(
+                        event,
+                        type,
+                        checkpointId,
+                        fromDateTime,
+                        toDateTime,
+                        pageable
+                );
+
+        List<CheckpointLogResponse> response = logsPage
+                .getContent()
+                .stream()
+                .map(this::toDto)
+                .toList();
+
+        return ResponseEntity.ok(Map.of(
+                "status", "SUCCESS",
+                "currentPage", logsPage.getNumber(),
+                "pageSize", logsPage.getSize(),
+                "totalElements", logsPage.getTotalElements(),
+                "totalPages", logsPage.getTotalPages(),
+                "data", response
+        ));
+    }
+
+
+}

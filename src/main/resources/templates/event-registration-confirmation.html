@@ -1,0 +1,207 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Registration Confirmed</title>
+</head>
+
+<body style="margin:0; padding:0; background-color:#ffffff; font-family: Arial, sans-serif;">
+
+<center style="width:100%; background-color:#ffffff;">
+    <table width="100%" cellspacing="0" cellpadding="0"
+           style="max-width:600px; margin:0 auto; border:1px solid #eaeaea; border-radius:8px; overflow:hidden;">
+
+        <!-- Logo -->
+        <tr>
+            <td align="center" style="padding:40px 30px 20px 30px;">
+                <img src="cid:eventLogo" alt="Event Logo" width="140"
+                     style="display:block; margin:0 auto; border:0;"/>
+            </td>
+        </tr>
+
+        <!-- Header -->
+        <tr>
+            <td align="center" style="padding:0 40px 30px 40px;">
+                <h1 style="font-size:22px; font-weight:600; color:#111827; margin:0 0 16px 0;">
+                    Registration Confirmed
+                </h1>
+
+                <p style="font-size:15px; line-height:1.6; color:#374151; margin:0 0 16px 0;">
+                    Dear <strong th:text="${userName}">Attendee</strong>,
+                </p>
+
+                <p style="font-size:15px; line-height:1.6; color:#374151; margin:0;">
+                    Your registration for
+                    <strong th:text="${eventName}">Event Name</strong>
+                    is successful.
+                </p>
+            </td>
+        </tr>
+
+        <!-- Event Description -->
+        <tr th:if="${eventDescription != null and !#strings.isEmpty(eventDescription)}">
+            <td style="padding:0 40px 30px 40px;">
+                <p style="font-size:15px; line-height:1.6; color:#374151; margin:0; white-space: pre-line;"
+                   th:text="${eventDescription}">
+                </p>
+            </td>
+        </tr>
+
+        <!-- Details Section -->
+        <tr>
+            <td style="padding:0 40px 30px 40px;">
+                <table width="100%" cellspacing="0" cellpadding="0"
+                       style="border-top:1px solid #f3f4f6; padding-top:30px;">
+                    <tr>
+
+                        <!-- Attendee -->
+                        <td width="50%" valign="top" align="left">
+                            <div style="font-size:11px; text-transform:uppercase; color:#9ca3af; font-weight:bold;">
+                                Attendee
+                            </div>
+
+                            <div style="font-size:15px; color:#111827; font-weight:500;"
+                                 th:text="${userName}">
+                            </div>
+
+                            <div style="font-size:13px; color:#6b7280;"
+                                 th:if="${userEmail != null and !#strings.isEmpty(userEmail)}"
+                                 th:text="${userEmail}">
+                            </div>
+                        </td>
+
+                        <!-- Event Info -->
+                        <td width="50%" valign="top" align="right">
+
+                            <!-- Location -->
+                            <div th:if="${eventLocation != null and !#strings.isEmpty(eventLocation)}">
+                                <div style="font-size:11px; text-transform:uppercase; color:#9ca3af; font-weight:bold;">
+                                    Location & Venue
+                                </div>
+
+                                <div style="font-size:15px; color:#111827; font-weight:500;"
+                                     th:text="${eventLocation}">
+                                </div>
+                            </div>
+
+                            <!-- Date + Time -->
+                            <div style="font-size:13px; color:#6b7280; margin-top:6px;"
+                                 th:if="${eventStartDate != null}"
+                                 th:text="${#temporals.format(eventStartDate, 'EEEE, dd MMM yyyy')}
+                                          + (${eventStartTime != null} ? ' | ' + ${eventStartTime} : '')">
+                            </div>
+
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+
+        <!-- QR Section -->
+        <tr>
+            <td align="center" style="padding:0 40px 30px 40px;">
+                <table width="100%" cellspacing="0" cellpadding="0"
+                       style="background-color:#eeeeee; padding:30px; border-radius:12px; border:1px solid #f0f0f0;">
+                    <tr>
+                        <td align="center">
+
+                            <img src="cid:qrImage"
+                                 alt="Entry QR"
+                                 width="140"
+                                 style="display:block; margin:0 auto 15px auto;"/>
+
+                            <div style="font-size:11px; text-transform:uppercase; color:#9ca3af; font-weight:bold;">
+                                Entry Badge Code
+                            </div>
+
+                            <div style="font-size:20px; font-weight:700; color:#111827; letter-spacing:3px;"
+                                 th:text="${badgeCode}">
+                            </div>
+
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+
+        <!-- Support Section -->
+        <tr th:if="${(supportEmail != null and !#strings.isEmpty(supportEmail))
+                 or (supportPhone != null and !#strings.isEmpty(supportPhone))
+                 or (eventWebsite != null and !#strings.isEmpty(eventWebsite))}">
+            <td align="center" style="padding:0 40px 30px 40px;">
+
+                <p style="font-size:13px; color:#6b7280;">
+                    For support or inquiries:
+                </p>
+
+                <div style="font-size:14px;">
+
+                    <!-- Email -->
+                    <a th:if="${supportEmail != null and !#strings.isEmpty(supportEmail)}"
+                       th:href="'mailto:' + ${supportEmail}"
+                       style="color:#111827; text-decoration:none; font-weight:500;"
+                       th:text="${supportEmail}">
+                    </a>
+
+                    <!-- Separator -->
+                    <span th:if="${supportEmail != null and !#strings.isEmpty(supportEmail)
+                                  and supportPhone != null and !#strings.isEmpty(supportPhone)}"
+                          style="margin:0 8px; color:#d1d5db;">•</span>
+
+                    <!-- Phone -->
+                    <span th:if="${supportPhone != null and !#strings.isEmpty(supportPhone)}"
+                          style="color:#111827; font-weight:500;"
+                          th:text="${supportPhone}">
+                    </span>
+
+                </div>
+
+                <!-- Website -->
+                <div style="margin-top:10px;"
+                     th:if="${eventWebsite != null and !#strings.isEmpty(eventWebsite)}">
+                    <a th:href="${eventWebsite}"
+                       style="color:#6b7280; font-size:13px; text-decoration:underline;"
+                       th:text="${eventWebsite}">
+                    </a>
+                </div>
+
+                <p style="font-size:12px; color:#9ca3af; margin-top:20px; font-style:italic;">
+                    Please do not reply to this email.
+                </p>
+            </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+            <td align="center"
+                style="padding:30px; background:#f9fafb; border-top:1px solid #f3f4f6;">
+
+                <p style="font-size:11px; color:#6b7280;">
+                    This confirms your registration for
+                    <strong th:text="${eventName}"></strong>.
+                </p>
+
+                <span style="font-size:9px; color:#9ca3af; text-transform:uppercase;">
+                    Powered by
+                </span>
+
+                <img src="https://quantumshare.quantumparadigm.in/vedio/Planotech_Logo_Black.png"
+                     width="80"
+                     style="display:block; margin:10px auto; opacity:0.8;"/>
+
+                <p style="font-size:10px; color:#9ca3af;">
+                    © 2026 Planotech Event & Marketing Pvt Ltd
+                </p>
+
+            </td>
+        </tr>
+
+    </table>
+</center>
+
+</body>
+</html>
